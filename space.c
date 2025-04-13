@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <string.h>
 
-#define PLANET_IMPLEMENTATION
+#define SPACE_IMPLEMENTATION
 #include "space.h"
 
 Space space = {0};
@@ -14,7 +14,6 @@ void print(const char *text) {
   memcpy(data, text, len);
   printf("%s\n", data);
 }
-
 
 int main() {
   print("Hello, World!");
