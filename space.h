@@ -45,6 +45,9 @@ void *space_realloc_planetid(Space *space, void *ptr, size_t old_size,
 
 bool space_init_capacity(Space *space, size_t size_in_bytes);
 size_t space__find_planet_id_from_ptr(Space *space, void *ptr);
+Planet *space__find_planet_from_ptr(Space *space, void *ptr);
+bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
+                            size_t new_size, size_t *planet_id, void *new_ptr);
 
 #endif // SPACE_H_
 
@@ -193,15 +196,24 @@ void *space_calloc_planetid(Space *space, size_t nmemb, size_t size,
 void *space_realloc_planetid(Space *space, void *ptr, size_t old_size,
                              size_t new_size, size_t *planet_id) {
   if (old_size >= new_size) {
-    ssize_t id = space__find_planet_id_from_ptr(space, ptr);
-    if (id >= 0) {
-      *planet_id = id;
+    Planet *p = space__find_planet_from_ptr(space, ptr);
+    if (p) {
+      // This is needed to aciev the free functionality that realloc provides.
+      p->count = new_size;
+      *planet_id = p->id;
       return ptr;
     }
     planet_id = NULL;
     return NULL;
   }
-  char *new_ptr = space_malloc_planetid(space, new_size, planet_id);
+
+  char *new_ptr = NULL;
+  if (try_to_expand_in_place(space, ptr, old_size, new_size, planet_id,
+                             new_ptr)) {
+    return ptr;
+  }
+
+  new_ptr = space_malloc_planetid(space, new_size, planet_id);
   memcpy(new_ptr, ptr, old_size);
   return new_ptr;
 }
@@ -248,6 +260,51 @@ size_t space__find_planet_id_from_ptr(Space *space, void *ptr) {
   }
 
   return -1;
+}
+
+Planet *space__find_planet_from_ptr(Space *space, void *ptr) {
+  if (!ptr || !space) {
+    return NULL;
+  }
+  if (!space->sun || !space->sun->elements) {
+    return NULL;
+  }
+  if (ptr < space->sun->elements) {
+    return NULL;
+  }
+
+  for (Planet *p = space->sun; p; p = p->next) {
+    if (p->elements + p->capacity - ptr >= 0) {
+      return p;
+    }
+  }
+
+  return NULL;
+}
+
+bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
+                            size_t new_size, size_t *planet_id, void *new_ptr) {
+
+  new_ptr = NULL;
+  Planet *p = space__find_planet_from_ptr(space, ptr);
+  if (p) {
+    if (p->count + new_size > p->capacity) {
+      planet_id = NULL;
+      return false;
+    }
+    if (p->count != old_size) {
+      planet_id = NULL;
+      return false;
+    }
+
+    p->count = new_size;
+    new_ptr = p->elements;
+    *planet_id = p->id;
+    return true;
+  }
+
+  planet_id = NULL;
+  return false;
 }
 
 #endif // SPACE_IMPLEMENTATION
