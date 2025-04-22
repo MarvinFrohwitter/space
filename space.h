@@ -294,7 +294,7 @@ void *space_realloc_planetid(Space *space, void *ptr, size_t old_size,
   if (old_size >= new_size) {
     Planet *p = space__find_planet_from_ptr(space, ptr);
     if (p) {
-      // This is needed to aciev the free functionality that realloc provides.
+      // This is needed to achieve the free functionality that realloc provides.
       p->count = new_size;
       *planet_id = p->id;
       return ptr;
