@@ -49,6 +49,102 @@ Planet *space__find_planet_from_ptr(Space *space, void *ptr);
 bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
                             size_t new_size, size_t *planet_id, void *new_ptr);
 
+#define DAP_CAP 64
+#define space_dap(space, dynamic_array, element)                               \
+  do {                                                                         \
+    if ((dynamic_array)->capacity <= (dynamic_array)->count) {                 \
+      size_t old_capacity = (dynamic_array)->capacity;                         \
+      if ((dynamic_array)->capacity == 0)                                      \
+        (dynamic_array)->capacity = DAP_CAP;                                   \
+      else                                                                     \
+        (dynamic_array)->capacity = (dynamic_array)->capacity * 2;             \
+                                                                               \
+      (dynamic_array)->elements = space_realloc(                               \
+          (space), (dynamic_array)->elements,                                  \
+          sizeof(*(dynamic_array)->elements) * old_capacity,                   \
+          sizeof(*(dynamic_array)->elements) * (dynamic_array)->capacity);     \
+                                                                               \
+      if ((dynamic_array)->elements == NULL) {                                 \
+        fprintf(                                                               \
+            stderr,                                                            \
+            "The allocation for the dynamic array has failed in: %s: %d\n",    \
+            __FILE__, __LINE__);                                               \
+        abort();                                                               \
+      }                                                                        \
+    }                                                                          \
+                                                                               \
+    (dynamic_array)->elements[(dynamic_array)->count] = (element);             \
+    (dynamic_array)->count = (dynamic_array)->count + 1;                       \
+  } while (0)
+
+#define space_dapc(space, dynamic_array, new_elements, new_elements_count)     \
+  do {                                                                         \
+    if ((new_elements) != NULL) {                                              \
+      if ((dynamic_array)->capacity <                                          \
+          (dynamic_array)->count + new_elements_count) {                       \
+        size_t old_capacity = (dynamic_array)->capacity;                       \
+        if ((dynamic_array)->capacity == 0) {                                  \
+          (dynamic_array)->capacity = DAP_CAP;                                 \
+        }                                                                      \
+        while ((dynamic_array)->capacity <                                     \
+               (dynamic_array)->count + new_elements_count) {                  \
+          (dynamic_array)->capacity = (dynamic_array)->capacity * 2;           \
+        }                                                                      \
+        (dynamic_array)->elements = realloc(                                   \
+            (space), (dynamic_array)->elements,                                \
+            sizeof(*(dynamic_array)->elements) * old_capacity,                 \
+            sizeof(*(dynamic_array)->elements) * (dynamic_array)->capacity);   \
+        if ((dynamic_array)->elements == NULL) {                               \
+          fprintf(                                                             \
+              stderr,                                                          \
+              "The allocation for the dynamic array has failed in: %s: %d\n",  \
+              __FILE__, __LINE__);                                             \
+          abort();                                                             \
+        }                                                                      \
+      }                                                                        \
+      memcpy((dynamic_array)->elements + (dynamic_array)->count,               \
+             (new_elements),                                                   \
+             sizeof(*(dynamic_array)->elements) * (new_elements_count));       \
+      (dynamic_array)->count = (dynamic_array)->count + new_elements_count;    \
+    }                                                                          \
+  } while (0)
+
+#define space_dapf(space, dynamic_array, fmt, ...)                             \
+  do {                                                                         \
+    int n = snprintf(NULL, 0, (fmt), ##__VA_ARGS__);                           \
+    if (n == -1) {                                                             \
+      assert(0 && "snprintf failed!");                                         \
+    }                                                                          \
+    n += 1;                                                                    \
+    if ((dynamic_array)->capacity < (dynamic_array)->count + n) {              \
+      size_t old_capacity = (dynamic_array)->capacity;                         \
+      if ((dynamic_array)->capacity == 0) {                                    \
+        (dynamic_array)->capacity = DAP_CAP;                                   \
+      }                                                                        \
+      while ((dynamic_array)->capacity < (dynamic_array)->count + n) {         \
+        (dynamic_array)->capacity = (dynamic_array)->capacity * 2;             \
+      }                                                                        \
+      (dynamic_array)->elements = space_realloc(                               \
+          (space), (dynamic_array)->elements,                                  \
+          sizeof(*(dynamic_array)->elements) * old_capacity,                   \
+          sizeof(*(dynamic_array)->elements) * (dynamic_array)->capacity);     \
+      if ((dynamic_array)->elements == NULL) {                                 \
+        fprintf(                                                               \
+            stderr,                                                            \
+            "The allocation for the dynamic array has failed in: %s: %d\n",    \
+            __FILE__, __LINE__);                                               \
+        abort();                                                               \
+      }                                                                        \
+    }                                                                          \
+                                                                               \
+    int err = snprintf((dynamic_array)->elements + (dynamic_array)->count, n,  \
+                       (fmt), ##__VA_ARGS__);                                  \
+    if (err == -1) {                                                           \
+      assert(0 && "snprintf failed!");                                         \
+    }                                                                          \
+    (dynamic_array)->count += err;                                             \
+  } while (0);
+
 #endif // SPACE_H_
 
 // ===========================================================================
