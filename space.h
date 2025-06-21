@@ -350,7 +350,7 @@ size_t space__find_planet_id_from_ptr(Space *space, void *ptr) {
   }
 
   for (Planet *p = space->sun; p; p = p->next) {
-    if (p->elements + p->capacity - ptr >= 0) {
+    if ((uintptr_t *)p->elements + p->capacity - (uintptr_t *)ptr >= 0) {
       return p->id;
     }
   }
@@ -370,7 +370,7 @@ Planet *space__find_planet_from_ptr(Space *space, void *ptr) {
   }
 
   for (Planet *p = space->sun; p; p = p->next) {
-    if (p->elements + p->capacity - ptr >= 0) {
+    if ((uintptr_t *)p->elements + p->capacity - (uintptr_t *)ptr >= 0) {
       return p;
     }
   }
