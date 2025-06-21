@@ -90,7 +90,7 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
                (dynamic_array)->count + new_elements_count) {                  \
           (dynamic_array)->capacity = (dynamic_array)->capacity * 2;           \
         }                                                                      \
-        (dynamic_array)->elements = realloc(                                   \
+        (dynamic_array)->elements = space_realloc(                             \
             (space), (dynamic_array)->elements,                                \
             sizeof(*(dynamic_array)->elements) * old_capacity,                 \
             sizeof(*(dynamic_array)->elements) * (dynamic_array)->capacity);   \
