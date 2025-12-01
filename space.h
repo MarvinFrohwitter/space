@@ -263,6 +263,19 @@ void *space_malloc_planetid(Space *space, size_t size_in_bytes,
       continue;
     }
 
+    // TODO: Think about handling this by deleting the planet chunk in between.
+    // We can't get the original pointer at this point anyway.
+    // Recovery is outside the traditional behavior of this lib, which is
+    // freeing the complete space at once and be sure that every allocated
+    // memory is freed.
+    //
+    // We can't distinguish between an actual free call or destroying our
+    // reference by setting it to NULL.
+    //
+    // Marvin Frohwitter 01.12.2025
+    assert(p->elements &&
+           "ERROR:SPACE: Memory inside a space was freed or set to NULL"
+           "by an external call outside the space api!");
     void *place = &((uintptr_t *)p->elements)[p->count];
     p->count += size_in_bytes;
     *planet_id = p->id;
@@ -309,7 +322,9 @@ void *space_realloc_planetid(Space *space, void *ptr, size_t old_size,
   }
 
   char *new_ptr = space_malloc_planetid(space, new_size, planet_id);
-  memcpy(new_ptr, ptr, old_size);
+  if (new_ptr) {
+    memcpy(new_ptr, ptr, old_size);
+  }
   return new_ptr;
 }
 
