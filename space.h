@@ -325,7 +325,10 @@ void *space_realloc_planetid(Space *space, void *ptr, size_t old_size,
 
   char *new_ptr = space_malloc_planetid(space, new_size, planet_id);
   if (new_ptr) {
-    memcpy(new_ptr, ptr, old_size);
+    if (ptr) { // This is to ensure memcpy() does not copy from NULL, this is
+               // undefended behavior and a memory corruption.
+      memcpy(new_ptr, ptr, old_size);
+    }
   }
   return new_ptr;
 }
