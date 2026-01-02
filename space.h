@@ -180,12 +180,18 @@ Planet *space_init_planet(Space *space, size_t size_in_bytes) {
 }
 
 void space_free_planet(Space *space, Planet *planet) {
-  if (!planet) {
+  if (!planet || !space || !space->sun) {
     return;
   }
+
+  if (space->sun == planet) {
+    space->sun = planet->next;
+  }
+
   if (planet->prev) {
     planet->prev->next = planet->next;
   }
+
   if (planet->next) {
     planet->next->prev = planet->prev;
   }
@@ -204,16 +210,21 @@ void space_free_planet(Space *space, Planet *planet) {
 }
 
 void space_free_space(Space *space) {
-  for (Planet *next, *planet = space->sun; planet; planet = next) {
-    next = planet->next;
-    space_free_planet(space, planet);
+  while (space->sun) {
+    space_free_planet(space, space->sun);
   }
-  space->sun = NULL;
+  assert(space->planet_count == 0);
+  assert(space->sun == NULL);
 }
 
 void space_reset_planet(Planet *planet) { planet->count = 0; }
 void space_reset_planet_and_zero(Planet *planet) {
-  memset(planet->elements, 0, planet->capacity);
+  if (!planet) {
+    return;
+  }
+  if (planet->elements) {
+    memset(planet->elements, 0, planet->capacity);
+  }
   planet->count = 0;
 }
 
@@ -410,6 +421,9 @@ bool space_init_capacity_in_count_plantes(Space *space, size_t size_in_bytes,
   } else {
 
     size_t *ids = malloc(sizeof(*ids) * count);
+    if (!ids) {
+      return false;
+    }
     for (size_t i = 0; i < count; ++i) {
       if (!space_malloc_planetid(space, size_in_bytes, &ids[i])) {
         free(ids);
