@@ -169,7 +169,11 @@ Planet *space_init_planet(Space *space, size_t size_in_bytes) {
       free(planet);
       return NULL;
     }
-    planet->id = space->planet_count++;
+
+    // The '1+' is needed because 0 is an invalid id and
+    // space__find_planet_id_from_ptr() returns 0 if it could not be found.
+    // This allows to use size_t and still return an error value.
+    planet->id = 1 + space->planet_count++;
   }
 
   return planet;
@@ -427,16 +431,16 @@ bool space_init_capacity_in_count_plantes(Space *space, size_t size_in_bytes,
 
 size_t space__find_planet_id_from_ptr(Space *space, void *ptr) {
   if (!ptr || !space) {
-    return -1;
+    return 0;
   }
   if (!space->planet_count) {
-    return -1;
+    return 0;
   }
   if (!space->sun || !space->sun->elements) {
-    return -1;
+    return 0;
   }
   if (ptr < space->sun->elements) {
-    return -1;
+    return 0;
   }
 
   for (Planet *p = space->sun; p; p = p->next) {
@@ -445,7 +449,7 @@ size_t space__find_planet_id_from_ptr(Space *space, void *ptr) {
     }
   }
 
-  return -1;
+  return 0;
 }
 
 Planet *space__find_planet_from_ptr(Space *space, void *ptr) {
