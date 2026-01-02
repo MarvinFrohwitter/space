@@ -453,9 +453,6 @@ size_t space__find_planet_id_from_ptr(Space *space, void *ptr) {
   if (!space->sun || !space->sun->elements) {
     return 0;
   }
-  if (ptr < space->sun->elements) {
-    return 0;
-  }
 
   for (Planet *p = space->sun; p; p = p->next) {
     if ((char *)p->elements + p->capacity - (char *)ptr >= 0) {
@@ -474,9 +471,6 @@ Planet *space__find_planet_from_ptr(Space *space, void *ptr) {
     return NULL;
   }
   if (!space->sun || !space->sun->elements) {
-    return NULL;
-  }
-  if (ptr < space->sun->elements) {
     return NULL;
   }
 
