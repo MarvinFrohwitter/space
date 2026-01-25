@@ -25,7 +25,11 @@ typedef struct {
 
 Planet *space_init_planet(Space *space, size_t size_in_bytes);
 void space_free_planet(Space *space, Planet *planet);
+void space_free_planet_optional_freeing_data(Space *space, Planet *planet,
+                                             bool free_data);
 void space_free_space(Space *space);
+void space_free_space_internals_without_freeing_data(Space *space);
+
 void space_reset_planet(Planet *planet);
 bool space_reset_planet_id(Space *space, size_t id);
 
@@ -180,6 +184,11 @@ Planet *space_init_planet(Space *space, size_t size_in_bytes) {
 }
 
 void space_free_planet(Space *space, Planet *planet) {
+  space_free_planet_optional_freeing_data(space, planet, true);
+}
+
+void space_free_planet_optional_freeing_data(Space *space, Planet *planet,
+                                             bool free_data) {
   if (!planet || !space || !space->sun) {
     return;
   }
@@ -196,8 +205,10 @@ void space_free_planet(Space *space, Planet *planet) {
     planet->next->prev = planet->prev;
   }
 
-  free(planet->elements);
-  planet->elements = NULL;
+  if (free_data) {
+    free(planet->elements);
+    planet->elements = NULL;
+  }
   planet->count = 0;
   planet->capacity = 0;
   planet->next = NULL;
@@ -212,6 +223,18 @@ void space_free_planet(Space *space, Planet *planet) {
 void space_free_space(Space *space) {
   while (space->sun) {
     space_free_planet(space, space->sun);
+  }
+  assert(space->planet_count == 0);
+  assert(space->sun == NULL);
+}
+
+// The function is useful if you have to unit test a function that depends on
+// the space allocator, but you want to be sure to track every memory allocated
+// manually, so you free manually. But as a result calling space_free_space()
+// would result in double free so just free the structure.
+void space_free_space_internals_without_freeing_data(Space *space) {
+  while (space->sun) {
+    space_free_planet_optional_freeing_data(space, space->sun, false);
   }
   assert(space->planet_count == 0);
   assert(space->sun == NULL);
