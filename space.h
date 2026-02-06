@@ -1,6 +1,5 @@
 #ifndef SPACE_H_
 #define SPACE_H_
-// TODO: Make static inline prefix
 
 #include <stdbool.h>
 #include <stdint.h>
