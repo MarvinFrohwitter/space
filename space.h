@@ -77,7 +77,7 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
                             size_t new_size, size_t *planet_id);
 
 #define DAP_CAP 64
-#define space_dap(space, dynamic_array, element)                               \
+#define space_dap_impl(space, realloc_function, dynamic_array, element)        \
   do {                                                                         \
     if ((dynamic_array)->capacity <= (dynamic_array)->count) {                 \
       size_t old_capacity = (dynamic_array)->capacity;                         \
@@ -86,7 +86,7 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
       else                                                                     \
         (dynamic_array)->capacity = (dynamic_array)->capacity * 2;             \
                                                                                \
-      (dynamic_array)->elements = space_realloc(                               \
+      (dynamic_array)->elements = realloc_function(                            \
           (space), (dynamic_array)->elements,                                  \
           sizeof(*(dynamic_array)->elements) * old_capacity,                   \
           sizeof(*(dynamic_array)->elements) * (dynamic_array)->capacity);     \
@@ -104,7 +104,8 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
     (dynamic_array)->count = (dynamic_array)->count + 1;                       \
   } while (0)
 
-#define space_dapc(space, dynamic_array, new_elements, new_elements_count)     \
+#define space_dapc_impl(space, realloc_function, dynamic_array, new_elements,  \
+                        new_elements_count)                                    \
   do {                                                                         \
     if ((new_elements) != NULL) {                                              \
       if ((dynamic_array)->capacity <                                          \
@@ -117,7 +118,7 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
                (dynamic_array)->count + new_elements_count) {                  \
           (dynamic_array)->capacity = (dynamic_array)->capacity * 2;           \
         }                                                                      \
-        (dynamic_array)->elements = space_realloc(                             \
+        (dynamic_array)->elements = realloc_function(                          \
             (space), (dynamic_array)->elements,                                \
             sizeof(*(dynamic_array)->elements) * old_capacity,                 \
             sizeof(*(dynamic_array)->elements) * (dynamic_array)->capacity);   \
@@ -136,7 +137,7 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
     }                                                                          \
   } while (0)
 
-#define space_dapf(space, dynamic_array, fmt, ...)                             \
+#define space_dapf_impl(space, realloc_function, dynamic_array, fmt, ...)      \
   do {                                                                         \
     int n = snprintf(NULL, 0, (fmt), ##__VA_ARGS__);                           \
     if (n == -1) {                                                             \
@@ -151,7 +152,7 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
       while ((dynamic_array)->capacity < (dynamic_array)->count + n) {         \
         (dynamic_array)->capacity = (dynamic_array)->capacity * 2;             \
       }                                                                        \
-      (dynamic_array)->elements = space_realloc(                               \
+      (dynamic_array)->elements = realloc_function(                            \
           (space), (dynamic_array)->elements,                                  \
           sizeof(*(dynamic_array)->elements) * old_capacity,                   \
           sizeof(*(dynamic_array)->elements) * (dynamic_array)->capacity);     \
@@ -171,6 +172,27 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
     }                                                                          \
     (dynamic_array)->count += err;                                             \
   } while (0);
+
+#define space_dap(space, dynamic_array, element)                               \
+  space_dap_impl(space, space_realloc, dynamic_array, element)
+
+#define space_ndap(space, dynamic_array, element)                              \
+  space_dap_impl(space, space_realloc_force_new_planet, dynamic_array, element)
+
+#define space_dapc(space, dynamic_array, new_elements, new_elements_count)     \
+  space_dapc_impl(space, space_realloc, dynamic_array, new_elements,           \
+                  new_elements_count)
+
+#define space_ndapc(space, dynamic_array, new_elements, new_elements_count)    \
+  space_dapc_impl(space, space_realloc_force_new_planet, dynamic_array,        \
+                  new_elements, new_elements_count)
+
+#define space_dapf(space, dynamic_array, fmt, ...)                             \
+  space_dapf_impl(space, space_realloc, dynamic_array, fmt, __VA_ARGS__)
+
+#define space_ndapf(space, dynamic_array, fmt, ...)                            \
+  space_dapf_impl(space, space_realloc_force_new_planet, dynamic_array, fmt,   \
+                  __VA_ARGS__)
 
 #endif // SPACE_H_
 
