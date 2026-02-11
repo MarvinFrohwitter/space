@@ -187,11 +187,11 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
                   new_elements, new_elements_count)
 
 #define space_dapf(space, dynamic_array, fmt, ...)                             \
-  space_dapf_impl(space, space_realloc, dynamic_array, fmt, __VA_ARGS__)
+  space_dapf_impl(space, space_realloc, dynamic_array, fmt, ##__VA_ARGS__)
 
 #define space_ndapf(space, dynamic_array, fmt, ...)                            \
   space_dapf_impl(space, space_realloc_force_new_planet, dynamic_array, fmt,   \
-                  __VA_ARGS__)
+                  ##__VA_ARGS__)
 
 #endif // SPACE_H_
 
