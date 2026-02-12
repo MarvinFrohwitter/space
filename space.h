@@ -21,6 +21,7 @@ struct Planet {
 typedef struct {
   Planet *sun;
   size_t planet_count;
+  size_t id_counter;
 } Space;
 
 Planet *space_init_planet(Space *space, size_t size_in_bytes);
@@ -75,13 +76,21 @@ Planet *space__find_planet_from_ptr(Space *space, void *ptr);
 bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
                             size_t new_size, size_t *planet_id);
 
-#define DAP_CAP 64
+typedef struct {
+  size_t planet_count;
+  size_t allocated_capacity;
+  size_t allocated_count;
+} Space_Report;
+
+bool space_report_allocations(Space *space, Space_Report *report);
+
+#define SPACE_DAP_CAP 64
 #define space_dap_impl(space, realloc_function, dynamic_array, element)        \
   do {                                                                         \
     if ((dynamic_array)->capacity <= (dynamic_array)->count) {                 \
       size_t old_capacity = (dynamic_array)->capacity;                         \
       if ((dynamic_array)->capacity == 0)                                      \
-        (dynamic_array)->capacity = DAP_CAP;                                   \
+        (dynamic_array)->capacity = SPACE_DAP_CAP;                             \
       else                                                                     \
         (dynamic_array)->capacity = (dynamic_array)->capacity * 2;             \
                                                                                \
@@ -111,7 +120,7 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
           (dynamic_array)->count + new_elements_count) {                       \
         size_t old_capacity = (dynamic_array)->capacity;                       \
         if ((dynamic_array)->capacity == 0) {                                  \
-          (dynamic_array)->capacity = DAP_CAP;                                 \
+          (dynamic_array)->capacity = SPACE_DAP_CAP;                           \
         }                                                                      \
         while ((dynamic_array)->capacity <                                     \
                (dynamic_array)->count + new_elements_count) {                  \
@@ -146,7 +155,7 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
     if ((dynamic_array)->capacity < (dynamic_array)->count + n) {              \
       size_t old_capacity = (dynamic_array)->capacity;                         \
       if ((dynamic_array)->capacity == 0) {                                    \
-        (dynamic_array)->capacity = DAP_CAP;                                   \
+        (dynamic_array)->capacity = SPACE_DAP_CAP;                             \
       }                                                                        \
       while ((dynamic_array)->capacity < (dynamic_array)->count + n) {         \
         (dynamic_array)->capacity = (dynamic_array)->capacity * 2;             \
@@ -214,7 +223,8 @@ Planet *space_init_planet(Space *space, size_t size_in_bytes) {
     // The '1+' is needed because 0 is an invalid id and
     // space__find_planet_id_from_ptr() returns 0 if it could not be found.
     // This allows to use size_t and still return an error value.
-    planet->id = 1 + space->planet_count++;
+    planet->id = 1 + space->id_counter++;
+    space->planet_count++;
   }
 
   return planet;
@@ -624,4 +634,23 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
   return true;
 }
 
+bool space_report_allocations(Space *space, Space_Report *report) {
+  if (!space) {
+    return false;
+  }
+  report->planet_count = space->planet_count;
+  Planet *p = space->sun;
+  while (p) {
+    if (report->allocated_capacity + p->capacity > SIZE_MAX ||
+        report->allocated_count + p->count > SIZE_MAX) {
+      return false;
+    }
+
+    report->allocated_capacity += p->capacity;
+    report->allocated_count += p->count;
+    p = p->next;
+  }
+
+  return true;
+}
 #endif // SPACE_IMPLEMENTATION
