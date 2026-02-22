@@ -936,8 +936,7 @@ bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
                             size_t new_size, size_t *planet_id) {
 
   Planet *p = space__find_planet_from_ptr(space, ptr);
-  if (!p || (p->count != old_size) ||
-      (p->capacity - old_size != p->count) /*This seems wrong why?*/ ||
+  if (!p || !space__is_ptr_last_allocation_in_planet(p, ptr, old_size) ||
       (p->count + new_size > p->capacity)) {
     planet_id = NULL;
     return false;
