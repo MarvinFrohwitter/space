@@ -228,6 +228,7 @@ void *space_strcat(Space *space, const char *first, const char *second);
 #define space_vstrcat(space, first, ...)                                       \
   space_vstrcat_impl(space, first, __VA_ARGS__, NULL)
 
+void *space_vcat_impl(Space *space, ...);
 #define space_vcat(space, ...) space_vcat_impl(space, __VA_ARGS__, NULL)
 
 bool space__is_ptr_last_allocation_in_planet(Planet *p, void *ptr,
