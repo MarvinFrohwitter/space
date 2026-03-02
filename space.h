@@ -214,9 +214,6 @@ void *space_stpncpy(Space *space, const char *buf, size_t n);
 void *space_memcpy(Space *space, const void *buf, size_t n);
 void *space_memmove(Space *space, const void *buf, size_t n);
 
-bool space__is_ptr_last_allocation_in_planet(Planet *p, void *ptr,
-                                             size_t ptr_size);
-
 void *space_vstrcat_impl(Space *space, const char *first, ...);
 void *space_catf(Space *space, const void *first, size_t first_len,
                  const char *fmt, ...);
