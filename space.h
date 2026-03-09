@@ -205,6 +205,8 @@ bool space_report_allocations(Space *space, Space_Report *report);
                   ##__VA_ARGS__)
 
 void *space_printf(Space *space, const char *fmt, ...);
+void *space_catf(Space *space, const void *first, size_t first_len,
+                 const char *fmt, ...);
 void *space_strcat(Space *space, const char *first, const char *second);
 void *space_strdup(Space *space, const char *buf);
 void *space_strcpy(Space *space, const char *buf);
@@ -214,15 +216,11 @@ void *space_stpncpy(Space *space, const char *buf, size_t n);
 void *space_memcpy(Space *space, const void *buf, size_t n);
 void *space_memmove(Space *space, const void *buf, size_t n);
 
-void *space_vstrcat_impl(Space *space, const char *first, ...);
-void *space_catf(Space *space, const void *first, size_t first_len,
-                 const char *fmt, ...);
-void *space_strcat(Space *space, const char *first, const char *second);
-
 #define space_strcatf(space, first_str, fmt, ...)                              \
-  space_catf(space, first_str, frist_str ? strlen(first_str) : 0, (fmt),       \
+  space_catf(space, first_str, first_str ? strlen(first_str) : 0, (fmt),       \
              ##__VA_ARGS__)
 
+void *space_vstrcat_impl(Space *space, const char *first, ...);
 #define space_vstrcat(space, first, ...)                                       \
   space_vstrcat_impl(space, first, ##__VA_ARGS__, NULL)
 
@@ -314,14 +312,12 @@ void *space_vcat_impl(Space *space, ...) {
 
       arg = va_arg(args, char *);
     }
-
-    ((char *)p->elements)[p->count] = '\0';
     va_end(args);
     return (void *)first;
   }
 
 alloc: {}
-  size_t count = first_len + 1;
+  size_t count = first_len;
   {
     va_start(args, space);
     first = va_arg(args, char *);
@@ -352,7 +348,6 @@ alloc: {}
     arg = va_arg(args, char *);
   }
   va_end(args);
-  ((char *)p->elements)[p->count] = '\0';
 
   return ptr;
 }
@@ -371,10 +366,17 @@ void *space_vstrcat_impl(Space *space, const char *first, ...) {
 
     va_start(args, first);
     char *arg = va_arg(args, char *);
+
+    // This is needed to ensure the first arg can be part of the va_args.
+    // And the call in va_args does not expand with the previous state of
+    // concatenation.
+    char *place = (char *)first + first_len;
+    char replace = '\0';
+    if (arg) {
+      replace = arg[0];
+    }
+
     while (arg != NULL) {
-      printf("---------\n");
-      printf("%s\n", arg);
-      printf("---------\n");
       size_t arg_len = strlen(arg);
       if (p->count + arg_len > p->capacity) {
         // Restore the old allocation size to be consistent with the
@@ -385,10 +387,12 @@ void *space_vstrcat_impl(Space *space, const char *first, ...) {
       }
 
       memcpy(((char *)p->elements) + p->count - 1, arg, arg_len + 1);
+      *place = '\0';
       p->count += arg_len;
 
       arg = va_arg(args, char *);
     }
+    *place = replace;
 
     va_end(args);
     return (void *)first;
@@ -417,21 +421,19 @@ alloc: {}
   }
 
   if (first) {
-    memcpy(ptr, first, first_len);
-    p->count += first_len;
+    memcpy(ptr, first, first_len + 1);
+    p->count += first_len + 1;
   }
 
   va_start(args, first);
   char *arg = va_arg(args, char *);
   while (arg != NULL) {
     size_t arg_len = strlen(arg); // This is slow to compute the length again.
-    memcpy((char *)p->elements + p->count, arg, arg_len);
+    memcpy((char *)p->elements + p->count - 1, arg, arg_len + 1);
     p->count += arg_len;
     arg = va_arg(args, char *);
   }
   va_end(args);
-  ((char *)p->elements)[p->count] = '\0';
-
   return ptr;
 }
 
