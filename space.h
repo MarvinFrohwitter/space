@@ -73,10 +73,10 @@ void *space_realloc_planetid_force_new_planet(Space *space, void *ptr,
 bool space_init_capacity(Space *space, size_t size_in_bytes);
 bool space_init_capacity_in_count_plantes(Space *space, size_t size_in_bytes,
                                           size_t count);
-size_t space__find_planet_id_from_ptr(Space *space, void *ptr);
-Planet *space__find_planet_from_ptr(Space *space, void *ptr);
-bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
-                            size_t new_size, size_t *planet_id);
+size_t space_find_planet_id_from_ptr(Space *space, void *ptr);
+Planet *space_find_planet_from_ptr(Space *space, void *ptr);
+bool space_try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
+                                  size_t new_size, size_t *planet_id);
 
 typedef struct {
   size_t planet_count;
@@ -289,7 +289,7 @@ void *space_vcat_impl(Space *space, ...) {
   }
   va_end(args);
 
-  Planet *p = space__find_planet_from_ptr(space, (void *)first);
+  Planet *p = space_find_planet_from_ptr(space, (void *)first);
   if (p &&
       space__is_ptr_last_allocation_in_planet(p, (void *)first, first_len)) {
     size_t save = p->count;
@@ -335,7 +335,7 @@ alloc: {}
   }
 
   void *ptr = space_malloc(space, count);
-  p = space__find_planet_from_ptr(space, ptr);
+  p = space_find_planet_from_ptr(space, ptr);
   p->count -= count;
 
   memcpy(ptr, first, first_len);
@@ -357,7 +357,6 @@ alloc: {}
   return ptr;
 }
 
-// TODO
 void *space_vstrcat_impl(Space *space, const char *first, ...) {
   if (!space) {
     return NULL;
@@ -365,7 +364,7 @@ void *space_vstrcat_impl(Space *space, const char *first, ...) {
   size_t first_len = first ? strlen(first) : 0;
   va_list args;
 
-  Planet *p = space__find_planet_from_ptr(space, (void *)first);
+  Planet *p = space_find_planet_from_ptr(space, (void *)first);
   if (p && space__is_ptr_last_allocation_in_planet(p, (void *)first,
                                                    first_len + 1)) {
     size_t save = p->count;
@@ -373,6 +372,9 @@ void *space_vstrcat_impl(Space *space, const char *first, ...) {
     va_start(args, first);
     char *arg = va_arg(args, char *);
     while (arg != NULL) {
+      printf("---------\n");
+      printf("%s\n", arg);
+      printf("---------\n");
       size_t arg_len = strlen(arg);
       if (p->count + arg_len > p->capacity) {
         // Restore the old allocation size to be consistent with the
@@ -410,7 +412,7 @@ alloc: {}
     return ptr;
   } else {
     ptr = space_malloc(space, count);
-    p = space__find_planet_from_ptr(space, ptr);
+    p = space_find_planet_from_ptr(space, ptr);
     p->count -= count;
   }
 
@@ -444,7 +446,7 @@ void *space_catf(Space *space, const void *first, size_t first_len,
   va_end(args);
 
   size_t max_count = n + 1;
-  Planet *p = space__find_planet_from_ptr(space, (void *)first);
+  Planet *p = space_find_planet_from_ptr(space, (void *)first);
   if (p && (p->count + n <= p->capacity) &&
       space__is_ptr_last_allocation_in_planet(p, (void *)first, first_len)) {
     va_start(args, fmt);
@@ -483,7 +485,7 @@ void *space_strcat(Space *space, const char *first, const char *second) {
   size_t first_len = first ? strlen(first) : 0;
   size_t second_len = second ? strlen(second) : 0;
 
-  Planet *p = space__find_planet_from_ptr(space, (void *)first);
+  Planet *p = space_find_planet_from_ptr(space, (void *)first);
   if (p && (p->count + second_len <= p->capacity) &&
       space__is_ptr_last_allocation_in_planet(p, (void *)first, first_len)) {
 
@@ -587,7 +589,7 @@ Planet *space_init_planet(Space *space, size_t size_in_bytes) {
     }
 
     // The '1+' is needed because 0 is an invalid id and
-    // space__find_planet_id_from_ptr() returns 0 if it could not be found.
+    // space_find_planet_id_from_ptr() returns 0 if it could not be found.
     // This allows to use size_t and still return an error value.
     planet->id = 1 + space->id_counter++;
     space->planet_count++;
@@ -816,7 +818,7 @@ void *space_calloc_planetid(Space *space, size_t nmemb, size_t size,
 void *space_realloc_planetid(Space *space, void *ptr, size_t old_size,
                              size_t new_size, size_t *planet_id) {
   if (old_size >= new_size) {
-    Planet *p = space__find_planet_from_ptr(space, ptr);
+    Planet *p = space_find_planet_from_ptr(space, ptr);
     if (p) {
       //
       // This is needed to ensure just this one allocation is in the planet.
@@ -836,7 +838,7 @@ void *space_realloc_planetid(Space *space, void *ptr, size_t old_size,
     return NULL;
   }
 
-  if (try_to_expand_in_place(space, ptr, old_size, new_size, planet_id)) {
+  if (space_try_to_expand_in_place(space, ptr, old_size, new_size, planet_id)) {
     return ptr;
   }
 
@@ -945,7 +947,7 @@ bool space_init_capacity_in_count_plantes(Space *space, size_t size_in_bytes,
   return true;
 }
 
-size_t space__find_planet_id_from_ptr(Space *space, void *ptr) {
+size_t space_find_planet_id_from_ptr(Space *space, void *ptr) {
   if (!ptr || !space) {
     return 0;
   }
@@ -965,7 +967,7 @@ size_t space__find_planet_id_from_ptr(Space *space, void *ptr) {
   return 0;
 }
 
-Planet *space__find_planet_from_ptr(Space *space, void *ptr) {
+Planet *space_find_planet_from_ptr(Space *space, void *ptr) {
   if (!ptr || !space) {
     return NULL;
   }
@@ -985,10 +987,10 @@ Planet *space__find_planet_from_ptr(Space *space, void *ptr) {
   return NULL;
 }
 
-bool try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
-                            size_t new_size, size_t *planet_id) {
+bool space_try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
+                                  size_t new_size, size_t *planet_id) {
 
-  Planet *p = space__find_planet_from_ptr(space, ptr);
+  Planet *p = space_find_planet_from_ptr(space, ptr);
   if (!p || !space__is_ptr_last_allocation_in_planet(p, ptr, old_size) ||
       (p->count + new_size > p->capacity)) {
     planet_id = NULL;
