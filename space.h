@@ -544,6 +544,9 @@ void *space_stpncpy(Space *space, const char *buf, size_t n) {
   size_t nn = strlen(buf) + 1;
   size_t len = nn > n ? n : nn;
   char *result = space_strncpy(space, buf, len);
+  if (nn > n) {
+    return result + len;
+  }
   return result + len - 1;
 }
 
