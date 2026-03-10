@@ -23,6 +23,11 @@ int main() {
   space_malloc(&space, 100);
   ptr1 = space_realloc(&space, ptr1, 800, 800 + 200);
 
+  char *a = space_strdup(&space, "HELLO");
+  a = space_vstrcat(&space, a, "!ME");
+
+  printf("a = %s\n", a);
+
   space_free_space(&space);
   return 0;
 }
