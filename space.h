@@ -10,11 +10,13 @@
 
 #define SPACE_METHOD_MALLOC (0x10)
 #define SPACE_METHOD_MMAP (0x20)
+#define SPACE_METHOD_VIRTUAL_ALLOC (0x40)
 
 #ifndef SPACE_ALLOC_METHOD
 #define SPACE_ALLOC_METHOD (SPACE_METHOD_MALLOC)
 // #define SPACE_ALLOC_METHOD (SPACE_METHOD_MMAP)
 // #define SPACE_ALLOC_METHOD (SPACE_METHOD_MALLOC | SPACE_METHOD_MMAP)
+// #define SPACE_ALLOC_METHOD (SPACE_METHOD_MALLOC | SPACE_METHOD_VIRTUAL_ALLOC)
 #endif
 
 #ifndef SPACE_METHOD_DEFAULT
@@ -22,19 +24,43 @@
 #define SPACE_METHOD_DEFAULT SPACE_METHOD_MALLOC
 #elif SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
 #define SPACE_METHOD_DEFAULT SPACE_METHOD_MMAP
+#elif SPACE_ALLOC_METHOD & SPACE_METHOD_VIRTUAL_ALLOC
+#ifdef _WIN32
+#define SPACE_METHOD_DEFAULT SPACE_METHOD_VIRTUAL_ALLOC
+#else
+#define SPACE_ALLOC_METHOD -1
+#endif
 #else
 #define SPACE_METHOD_DEFAULT -1
 #endif
 #endif // SPACE_METHOD_DEFAULT
-
+//
+//
+//
 #if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
 #include <stdlib.h>
 #endif
+
 #if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
 #include <sys/mman.h>
 #endif
-#if !SPACE_ALLOC_METHOD
-static_assert(false, "No specified alloc method");
+
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_VIRTUAL_ALLOC
+#ifdef _WIN32
+
+#ifndef SPACE_DO_NOT_INCLUDE_WINDOWS_H_NOW
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
+#else
+#undef SPACE_ALLOC_METHOD
+#define SPACE_ALLOC_METHOD -1
+#endif
+#endif
+
+#ifndef SPACE_ALLOC_METHOD
+#error "No specified alloc method"
 #endif
 
 #ifndef SPACEDECL
@@ -1041,6 +1067,31 @@ method_rerun:
     }
     break;
 #endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_VIRTUAL_ALLOC
+  case SPACE_METHOD_VIRTUAL_ALLOC:
+    planet = VirtualAllocEx(GetCurrentProcess(), NULL, sizeof(*planet),
+                            MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (planet != NULL) {
+      memset(planet, 0, sizeof(*planet));
+      planet->capacity = size_in_bytes;
+      planet->count = 0;
+      planet->elements =
+          VirtualAllocEx(GetCurrentProcess(), NULL, planet->capacity,
+                         MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+      if (planet->elements == NULL) {
+        VirtualFreeEx(GetCurrentProcess(), (LPVOID)planet, sizeof(*planet),
+                      MEM_RELEASE);
+        return NULL;
+      }
+
+      // The '1+' is needed because 0 is an invalid id and
+      // space_find_planet_id_from_ptr() returns 0 if it could not be found.
+      // This allows to use size_t and still return an error value.
+      planet->id = 1 + space->id_counter++;
+    }
+
+    break;
+#endif
   default:
     assert(false && "UNREACHABLE: This allocation method is not supported");
   }
@@ -1111,6 +1162,12 @@ SPACEDEF void space_free_planet_optional_freeing_data(Space *space,
       munmap(planet->elements, planet->capacity);
       break;
 #endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_VIRTUAL_ALLOC
+    case SPACE_METHOD_VIRTUAL_ALLOC:
+      VirtualFreeEx(GetCurrentProcess(), (LPVOID)planet->elements,
+                    planet->capacity, MEM_RELEASE);
+      break;
+#endif
     default:
       assert(false && "UNREACHABLE: This allocation method is not supported");
     }
@@ -1136,6 +1193,12 @@ method_rerun2:
 #if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
   case SPACE_METHOD_MMAP:
     munmap(planet, sizeof(*planet));
+    break;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_VIRTUAL_ALLOC
+  case SPACE_METHOD_VIRTUAL_ALLOC:
+    VirtualFreeEx(GetCurrentProcess(), (LPVOID)planet, sizeof(*planet),
+                  MEM_RELEASE);
     break;
 #endif
   default:
@@ -1770,6 +1833,16 @@ SPACEDEF bool space_init_capacity_in_count_plantes(Space *space,
       }
       break;
 #endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_VIRTUAL_ALLOC
+    case SPACE_METHOD_VIRTUAL_ALLOC:
+      ids = VirtualAllocEx(GetCurrentProcess(), NULL, size_to_alloc,
+                           MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
+      if (ids == NULL) {
+        return false;
+      }
+      break;
+#endif
     default:
       assert(false && "UNREACHABLE: This allocation method is not supported");
     }
@@ -1789,6 +1862,12 @@ SPACEDEF bool space_init_capacity_in_count_plantes(Space *space,
 #if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
         case SPACE_METHOD_MMAP:
           munmap(ids, size_to_alloc);
+          return false;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_VIRTUAL_ALLOC
+        case SPACE_METHOD_VIRTUAL_ALLOC:
+          VirtualFreeEx(GetCurrentProcess(), (LPVOID)ids, size_to_alloc,
+                        MEM_RELEASE);
           return false;
 #endif
         default:
@@ -1814,6 +1893,12 @@ SPACEDEF bool space_init_capacity_in_count_plantes(Space *space,
           munmap(ids, size_to_alloc);
           return false;
 #endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_VIRTUAL_ALLOC
+        case SPACE_METHOD_VIRTUAL_ALLOC:
+          VirtualFreeEx(GetCurrentProcess(), (LPVOID)ids, size_to_alloc,
+                        MEM_RELEASE);
+          return false;
+#endif
         default:
           assert(false &&
                  "UNREACHABLE: This allocation method is not supported");
@@ -1834,6 +1919,12 @@ SPACEDEF bool space_init_capacity_in_count_plantes(Space *space,
 #if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
     case SPACE_METHOD_MMAP:
       munmap(ids, size_to_alloc);
+      break;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_VIRTUAL_ALLOC
+    case SPACE_METHOD_VIRTUAL_ALLOC:
+      VirtualFreeEx(GetCurrentProcess(), (LPVOID)ids, size_to_alloc,
+                    MEM_RELEASE);
       break;
 #endif
     default:
