@@ -6,8 +6,34 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+
+#define SPACE_METHOD_MALLOC (0x10)
+#define SPACE_METHOD_MMAP (0x20)
+
+#ifndef SPACE_ALLOC_METHOD
+#define SPACE_ALLOC_METHOD (SPACE_METHOD_MALLOC | SPACE_METHOD_MMAP)
+// #define SPACE_ALLOC_METHOD (SPACE_METHOD_MALLOC)
+// #define SPACE_ALLOC_METHOD (SPACE_METHOD_MMAP)
+#endif
+
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
+#define SPACE_METHOD_DEFAULT SPACE_METHOD_MALLOC
+#elif SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
+#define SPACE_METHOD_DEFAULT SPACE_METHOD_MMAP
+#else
+#define SPACE_METHOD_DEFAULT -1
+#endif
+
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
+#include <stdlib.h>
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
+#include <sys/mman.h>
+#endif
+#if !SPACE_ALLOC_METHOD
+static_assert(false, "No specified alloc method");
+#endif
 
 #ifndef SPACEDEF
 #define SPACEDEF static inline
@@ -28,6 +54,8 @@ typedef struct {
   Planet *sun;
   size_t planet_count;
   size_t id_counter;
+
+  unsigned char alloc_method;
 } Space;
 
 Planet *space_init_planet(Space *space, size_t size_in_bytes);
@@ -948,21 +976,56 @@ SPACEDEF void *space_memmove(Space *space, const void *buf, size_t n) {
  * @return Pointer to the newly created Planet, or NULL on allocation failure.
  */
 SPACEDEF Planet *space_init_planet(Space *space, size_t size_in_bytes) {
-  Planet *planet = malloc(sizeof(*planet));
-  if (planet) {
-    memset(planet, 0, sizeof(*planet));
-    planet->capacity = size_in_bytes;
-    planet->count = 0;
-    planet->elements = malloc(planet->capacity);
-    if (!planet->elements) {
-      free(planet);
-      return NULL;
-    }
+  Planet *planet = NULL;
+method_rerun:
+  switch (space->alloc_method) {
+  case 0:
+    space->alloc_method = SPACE_METHOD_DEFAULT;
+    goto method_rerun;
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
+  case SPACE_METHOD_MALLOC:
+    planet = malloc(sizeof(*planet));
+    if (planet) {
+      memset(planet, 0, sizeof(*planet));
+      planet->capacity = size_in_bytes;
+      planet->count = 0;
+      planet->elements = malloc(planet->capacity);
+      if (!planet->elements) {
+        free(planet);
+        return NULL;
+      }
 
-    // The '1+' is needed because 0 is an invalid id and
-    // space_find_planet_id_from_ptr() returns 0 if it could not be found.
-    // This allows to use size_t and still return an error value.
-    planet->id = 1 + space->id_counter++;
+      // The '1+' is needed because 0 is an invalid id and
+      // space_find_planet_id_from_ptr() returns 0 if it could not be found.
+      // This allows to use size_t and still return an error value.
+      planet->id = 1 + space->id_counter++;
+    }
+    break;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
+  case SPACE_METHOD_MMAP:
+    planet = mmap(NULL, sizeof(*planet), PROT_READ | PROT_WRITE,
+                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (planet != MAP_FAILED) {
+      memset(planet, 0, sizeof(*planet));
+      planet->capacity = size_in_bytes;
+      planet->count = 0;
+      planet->elements = mmap(NULL, planet->capacity, PROT_READ | PROT_WRITE,
+                              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+      if (planet->elements == MAP_FAILED) {
+        munmap(planet, sizeof(*planet));
+        return NULL;
+      }
+
+      // The '1+' is needed because 0 is an invalid id and
+      // space_find_planet_id_from_ptr() returns 0 if it could not be found.
+      // This allows to use size_t and still return an error value.
+      planet->id = 1 + space->id_counter++;
+    }
+    break;
+#endif
+  default:
+    assert(false && "UNREACHABLE: This allocation method is not supported");
   }
 
   return planet;
@@ -1016,7 +1079,25 @@ SPACEDEF void space_free_planet_optional_freeing_data(Space *space,
   }
 
   if (free_data) {
-    free(planet->elements);
+  method_rerun1:
+    switch (space->alloc_method) {
+    case 0:
+      space->alloc_method = SPACE_METHOD_DEFAULT;
+      goto method_rerun1;
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
+    case SPACE_METHOD_MALLOC:
+      free(planet->elements);
+      break;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
+    case SPACE_METHOD_MMAP:
+      munmap(planet->elements, planet->capacity);
+      break;
+#endif
+    default:
+      assert(false && "UNREACHABLE: This allocation method is not supported");
+    }
+
     planet->elements = NULL;
   }
   planet->count = 0;
@@ -1024,9 +1105,26 @@ SPACEDEF void space_free_planet_optional_freeing_data(Space *space,
   planet->next = NULL;
   planet->prev = NULL;
   planet->id = 0;
-  free(planet);
-  planet = NULL;
 
+method_rerun2:
+  switch (space->alloc_method) {
+  case 0:
+    space->alloc_method = SPACE_METHOD_DEFAULT;
+    goto method_rerun2;
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
+  case SPACE_METHOD_MALLOC:
+    free(planet);
+    break;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
+  case SPACE_METHOD_MMAP:
+    munmap(planet, sizeof(*planet));
+    break;
+#endif
+  default:
+    assert(false && "UNREACHABLE: This allocation method is not supported");
+  }
+  planet = NULL;
   space->planet_count--;
 }
 
@@ -1631,25 +1729,99 @@ SPACEDEF bool space_init_capacity_in_count_plantes(Space *space,
       }
     }
   } else {
-
-    size_t *ids = malloc(sizeof(*ids) * count);
-    if (!ids) {
-      return false;
-    }
-    for (size_t i = 0; i < count; ++i) {
-      if (!space_malloc_planetid(space, size_in_bytes, &ids[i])) {
-        free(ids);
+    void *ids = NULL;
+    size_t size_to_alloc = sizeof(*(size_t *)ids) * count;
+  method_rerun1:
+    switch (space->alloc_method) {
+    case 0:
+      space->alloc_method = SPACE_METHOD_DEFAULT;
+      goto method_rerun1;
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
+    case SPACE_METHOD_MALLOC:
+      ids = malloc(size_to_alloc);
+      if (!ids) {
         return false;
+      }
+      break;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
+    case SPACE_METHOD_MMAP:
+      ids = mmap(NULL, size_to_alloc, PROT_READ | PROT_WRITE,
+                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+      if (ids == MAP_FAILED) {
+        return false;
+      }
+      break;
+#endif
+    default:
+      assert(false && "UNREACHABLE: This allocation method is not supported");
+    }
+
+    for (size_t i = 0; i < count; ++i) {
+      if (!space_malloc_planetid(space, size_in_bytes, &((size_t *)ids)[i])) {
+      method_rerun2:
+        switch (space->alloc_method) {
+        case 0:
+          space->alloc_method = SPACE_METHOD_DEFAULT;
+          goto method_rerun2;
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
+        case SPACE_METHOD_MALLOC:
+          free(ids);
+          return false;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
+        case SPACE_METHOD_MMAP:
+          munmap(ids, size_to_alloc);
+          return false;
+#endif
+        default:
+          assert(false &&
+                 "UNREACHABLE: This allocation method is not supported");
+        }
       }
     }
     for (size_t i = 0; i < count; ++i) {
-      if (!space_reset_planet_id(space, ids[i])) {
-        free(ids);
-        return false;
+      if (!space_reset_planet_id(space, ((size_t *)ids)[i])) {
+      method_rerun3:
+        switch (space->alloc_method) {
+        case 0:
+          space->alloc_method = SPACE_METHOD_DEFAULT;
+          goto method_rerun3;
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
+        case SPACE_METHOD_MALLOC:
+          free(ids);
+          return false;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
+        case SPACE_METHOD_MMAP:
+          munmap(ids, size_to_alloc);
+          return false;
+#endif
+        default:
+          assert(false &&
+                 "UNREACHABLE: This allocation method is not supported");
+        }
       }
     }
 
-    free(ids);
+  method_rerun4:
+    switch (space->alloc_method) {
+    case 0:
+      space->alloc_method = SPACE_METHOD_DEFAULT;
+      goto method_rerun4;
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MALLOC
+    case SPACE_METHOD_MALLOC:
+      free(ids);
+      break;
+#endif
+#if SPACE_ALLOC_METHOD & SPACE_METHOD_MMAP
+    case SPACE_METHOD_MMAP:
+      munmap(ids, size_to_alloc);
+      break;
+#endif
+    default:
+      assert(false && "UNREACHABLE: This allocation method is not supported");
+    }
   }
 
   return true;
