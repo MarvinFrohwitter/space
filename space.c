@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <string.h>
 
-#define SPACEDEF inline
 #define SPACE_IMPLEMENTATION
 #include "space.h"
 

@@ -35,6 +35,10 @@
 static_assert(false, "No specified alloc method");
 #endif
 
+#ifndef SPACEDECL
+#define SPACEDECL static inline
+#endif //SPACEDECL
+
 #ifndef SPACEDEF
 #define SPACEDEF static inline
 #endif // SPACEDEF
@@ -58,56 +62,56 @@ typedef struct {
   unsigned char alloc_method;
 } Space;
 
-Planet *space_init_planet(Space *space, size_t size_in_bytes);
-void space_free_planet(Space *space, Planet *planet);
-void space_free_planet_optional_freeing_data(Space *space, Planet *planet,
+SPACEDECL Planet *space_init_planet(Space *space, size_t size_in_bytes);
+SPACEDECL void space_free_planet(Space *space, Planet *planet);
+SPACEDECL void space_free_planet_optional_freeing_data(Space *space, Planet *planet,
                                              bool free_data);
-void space_free_space(Space *space);
-void space_free_space_internals_without_freeing_data(Space *space);
+SPACEDECL void space_free_space(Space *space);
+SPACEDECL void space_free_space_internals_without_freeing_data(Space *space);
 
-void space_reset_planet(Planet *planet);
-bool space_reset_planet_id(Space *space, size_t id);
+SPACEDECL void space_reset_planet(Planet *planet);
+SPACEDECL bool space_reset_planet_id(Space *space, size_t id);
 
 // WARNING: Dangerous to use:
 // These functions sets the pointer to NULL so memory ownership is passed to the
 // caller. That means the caller should free the allocated data.
-void space_reset_planet_and_zero(Planet *planet);
-bool space_reset_planet_and_zero_id(Space *space, size_t id);
-void space_reset_space_and_zero(Space *space);
+SPACEDECL void space_reset_planet_and_zero(Planet *planet);
+SPACEDECL bool space_reset_planet_and_zero_id(Space *space, size_t id);
+SPACEDECL void space_reset_space_and_zero(Space *space);
 
-void space_reset_space(Space *space);
-void *space_malloc(Space *space, size_t size_in_bytes);
-void *space_calloc(Space *space, size_t nmemb, size_t size);
-void *space_realloc(Space *space, void *ptr, size_t old_size, size_t new_size);
-void *space_alloc_planetid(Space *space, size_t size_in_bytes,
+SPACEDECL void space_reset_space(Space *space);
+SPACEDECL void *space_malloc(Space *space, size_t size_in_bytes);
+SPACEDECL void *space_calloc(Space *space, size_t nmemb, size_t size);
+SPACEDECL void *space_realloc(Space *space, void *ptr, size_t old_size, size_t new_size);
+SPACEDECL void *space_alloc_planetid(Space *space, size_t size_in_bytes,
                            size_t *planet_id, bool force_new_planet);
 
-void *space_malloc_planetid(Space *space, size_t size_in_bytes,
+SPACEDECL void *space_malloc_planetid(Space *space, size_t size_in_bytes,
                             size_t *planet_id);
-void *space_calloc_planetid(Space *space, size_t nmemb, size_t size,
+SPACEDECL void *space_calloc_planetid(Space *space, size_t nmemb, size_t size,
                             size_t *planet_id);
-void *space_realloc_planetid(Space *space, void *ptr, size_t old_size,
+SPACEDECL void *space_realloc_planetid(Space *space, void *ptr, size_t old_size,
                              size_t new_size, size_t *planet_id);
 
-void *space_malloc_force_new_planet(Space *space, size_t size_in_bytes);
-void *space_calloc_force_new_planet(Space *space, size_t nmemb, size_t size);
-void *space_realloc_force_new_planet(Space *space, void *ptr, size_t old_size,
+SPACEDECL void *space_malloc_force_new_planet(Space *space, size_t size_in_bytes);
+SPACEDECL void *space_calloc_force_new_planet(Space *space, size_t nmemb, size_t size);
+SPACEDECL void *space_realloc_force_new_planet(Space *space, void *ptr, size_t old_size,
                                      size_t new_size);
 
-void *space_malloc_planetid_force_new_planet(Space *space, size_t size_in_bytes,
+SPACEDECL void *space_malloc_planetid_force_new_planet(Space *space, size_t size_in_bytes,
                                              size_t *planet_id);
-void *space_calloc_planetid_force_new_planet(Space *space, size_t nmemb,
+SPACEDECL void *space_calloc_planetid_force_new_planet(Space *space, size_t nmemb,
                                              size_t size, size_t *planet_id);
-void *space_realloc_planetid_force_new_planet(Space *space, void *ptr,
+SPACEDECL void *space_realloc_planetid_force_new_planet(Space *space, void *ptr,
                                               size_t old_size, size_t new_size,
                                               size_t *planet_id);
 
-bool space_init_capacity(Space *space, size_t size_in_bytes);
-bool space_init_capacity_in_count_plantes(Space *space, size_t size_in_bytes,
+SPACEDECL bool space_init_capacity(Space *space, size_t size_in_bytes);
+SPACEDECL bool space_init_capacity_in_count_plantes(Space *space, size_t size_in_bytes,
                                           size_t count);
-size_t space_find_planet_id_from_ptr(Space *space, void *ptr);
-Planet *space_find_planet_from_ptr(Space *space, void *ptr);
-bool space_try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
+SPACEDECL size_t space_find_planet_id_from_ptr(Space *space, void *ptr);
+SPACEDECL Planet *space_find_planet_from_ptr(Space *space, void *ptr);
+SPACEDECL bool space_try_to_expand_in_place(Space *space, void *ptr, size_t old_size,
                                   size_t new_size, size_t *planet_id);
 
 typedef struct {
@@ -116,7 +120,7 @@ typedef struct {
   size_t allocated_count;
 } Space_Report;
 
-bool space_report_allocations(Space *space, Space_Report *report);
+SPACEDECL bool space_report_allocations(Space *space, Space_Report *report);
 
 #define SPACE_DAP_CAP 64
 #define space_dap_impl(space, realloc_function, dynamic_array, element)        \
@@ -213,7 +217,7 @@ bool space_report_allocations(Space *space, Space_Report *report);
       assert(0 && "snprintf failed!");                                         \
     }                                                                          \
     (dynamic_array)->count += err;                                             \
-  } while (0);
+  } while (0)
 
 #define space_dap(space, dynamic_array, element)                               \
   space_dap_impl(space, space_realloc, dynamic_array, element)
@@ -236,44 +240,43 @@ bool space_report_allocations(Space *space, Space_Report *report);
   space_dapf_impl(space, space_realloc_force_new_planet, dynamic_array, fmt,   \
                   ##__VA_ARGS__)
 
-void *space_printf(Space *space, const char *fmt, ...);
-void *space_snprintf(Space *space, int n, const char *fmt, ...);
+SPACEDECL void *space_printf(Space *space, const char *fmt, ...);
+SPACEDECL void *space_snprintf(Space *space, int n, const char *fmt, ...);
 #define space_sprintf(space, fmt, ...) space_printf(space, fmt, ##__VA_ARGS__)
-void *space_catf(Space *space, const void *first, size_t first_len,
+SPACEDECL void *space_catf(Space *space, const void *first, size_t first_len,
                  const char *fmt, ...);
-void *space_strcat(Space *space, const char *first, const char *second);
-void *space_strdup(Space *space, const char *buf);
-void *space_strcpy(Space *space, const char *buf);
-void *space_strncpy(Space *space, const char *buf, size_t n);
-void *space_stpcpy(Space *space, const char *buf);
-void *space_stpncpy(Space *space, const char *buf, size_t n);
-void *space_memcpy(Space *space, const void *buf, size_t n);
-void *space_memmove(Space *space, const void *buf, size_t n);
+SPACEDECL void *space_strcat(Space *space, const char *first, const char *second);
+SPACEDECL void *space_strdup(Space *space, const char *buf);
+SPACEDECL void *space_strcpy(Space *space, const char *buf);
+SPACEDECL void *space_strncpy(Space *space, const char *buf, size_t n);
+SPACEDECL void *space_stpcpy(Space *space, const char *buf);
+SPACEDECL void *space_stpncpy(Space *space, const char *buf, size_t n);
+SPACEDECL void *space_memcpy(Space *space, const void *buf, size_t n);
+SPACEDECL void *space_memmove(Space *space, const void *buf, size_t n);
 
 #define space_strcatf(space, first_str, fmt, ...)                              \
   space_catf(space, first_str, first_str ? strlen(first_str) : 0, (fmt),       \
              ##__VA_ARGS__)
-void *space_vstrcat_impl(Space *space, const char *first, ...);
+SPACEDECL void *space_vstrcat_impl(Space *space, const char *first, ...);
 #define space_vstrcat(space, first, ...)                                       \
   space_vstrcat_impl(space, first, ##__VA_ARGS__, NULL)
-void *space_vcat_impl(Space *space, ...);
+SPACEDECL void *space_vcat_impl(Space *space, ...);
 #define space_vcat(space, ...) space_vcat_impl(space, ##__VA_ARGS__, NULL)
 
-bool space__is_ptr_last_allocation_in_planet(Planet *p, void *ptr,
+SPACEDECL bool space__is_ptr_last_allocation_in_planet(Planet *p, void *ptr,
                                              size_t ptr_size);
-size_t space_align(size_t alignment, size_t value);
-size_t space_align_power2(size_t alignment, size_t value);
+SPACEDECL size_t space_align(size_t alignment, size_t value);
+SPACEDECL size_t space_align_power2(size_t alignment, size_t value);
 
 // Temporary space allocator =================================================
-Space *space_get_tspace(void);
+SPACEDECL Space *space_get_tspace(void);
 
 #define space_free_tspace() space_free_space(space_get_tspace())
 #define space_reset_tspace() space_reset_space(space_get_tspace())
 #define space_tmalloc(size_in_bytes)                                           \
-  space_malloc(space_get_tspace(), size_in_bytes);
+  space_malloc(space_get_tspace(), size_in_bytes)
 #define space_tcalloc(nmemb, size) space_calloc(space_get_tspace(), nmemb, size)
 #define space_trealloc(ptr, old_size, new_size)                                \
-  ;                                                                            \
   space_realloc(space_get_tspace(), ptr, old_size, new_size)
 
 #define space_talloc_planetid(size_in_bytes, planet_id, force_new_planet)      \
@@ -325,7 +328,7 @@ Space *space_get_tspace(void);
 #define space_tsprintf(fmt, ...)                                               \
   space_sprintf(space_get_tspace(), fmt, ##__VA_ARGS__)
 #define space_tsnprintf(n, fmt, ...)                                           \
-  space_snprintf(space_get_tspace(), n, fmt, ##__VA_ARGS__);
+  space_snprintf(space_get_tspace(), n, fmt, ##__VA_ARGS__)
 #define space_tcatf(first, first_len, fmt, ...)                                \
   space_catf(space_get_tspace(), first, first_len, fmt, ##__VA_ARGS__)
 #define space_tstrcat(first, second)                                           \
