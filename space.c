@@ -9,7 +9,7 @@
 // #define SPACE_MEMORY_LAYOUT_METHOD (SPACE_MEMORY_DOUBLE_LINKED_LIST | SPACE_MEMORY_STUCT_OF_ARRAYS)
 // #define SPACE_MEMORY_LAYOUT_METHOD (SPACE_MEMORY_DYNAMIC_ARRAY | SPACE_MEMORY_STUCT_OF_ARRAYS)
 
-// #define SPACE_MEMORY_LAYOUT_METHOD                                                                                     \
+// #define SPACE_MEMORY_LAYOUT_METHOD \
 //     (SPACE_MEMORY_DOUBLE_LINKED_LIST | SPACE_MEMORY_DYNAMIC_ARRAY | SPACE_MEMORY_STUCT_OF_ARRAYS)
 
 #define SPACE_IMPLEMENTATION
@@ -42,6 +42,13 @@ int main() {
     printf("a = %s\n", a);
 
     space_free_space(&space);
+
+    struct {
+        int *elements;
+        size_t count;
+        size_t capacity;
+    } da = {0};
+    space_tndap(&da, 2);
 
     printf("Size of the space: %zu\n", sizeof(Space));
 
